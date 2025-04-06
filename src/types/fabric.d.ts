@@ -16,6 +16,36 @@ declare module "fabric" {
     width: number;
     shadow?: fabric.Shadow | null;
   }
+
+  interface IEvent {
+    e: Event;
+    target?: fabric.Object;
+  }
+
+  namespace fabric {
+    class Rect extends Object {
+      width: number;
+      height: number;
+      left: number;
+      top: number;
+      set(options: any): this;
+    }
+
+    class Circle extends Object {
+      radius: number;
+      left: number;
+      top: number;
+      set(options: any): this;
+    }
+
+    class Textbox extends Object {
+      set(options: any): this;
+    }
+
+    class Object {
+      toJSON(propertiesToInclude?: string[]): any;
+    }
+  }
 }
 
 export {};

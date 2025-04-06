@@ -9,6 +9,9 @@ import { toast } from "sonner";
 export const DrawingCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [activeObject, setActiveObject] = useState<fabric.Object | null>(null);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   
   const { 
     activeTool, 
@@ -80,11 +83,17 @@ export const DrawingCanvas: React.FC = () => {
       fabricCanvas.renderAll();
     }
     
+    // Clean up mouse event handlers
+    fabricCanvas.off('mouse:down');
+    fabricCanvas.off('mouse:move');
+    fabricCanvas.off('mouse:up');
+    
     // Tool-specific handlers
     const handleMouseDown = (options: { e: MouseEvent }) => {
       if (!fabricCanvas) return;
       
       const pointer = fabricCanvas.getPointer(options.e);
+      setStartPoint({ x: pointer.x, y: pointer.y });
       
       if (activeTool === "rectangle") {
         const rect = new fabric.Rect({
@@ -100,6 +109,8 @@ export const DrawingCanvas: React.FC = () => {
         
         fabricCanvas.add(rect);
         fabricCanvas.setActiveObject(rect);
+        setActiveObject(rect);
+        setIsDrawing(true);
       } else if (activeTool === "circle") {
         const circle = new fabric.Circle({
           left: pointer.x,
@@ -113,6 +124,8 @@ export const DrawingCanvas: React.FC = () => {
         
         fabricCanvas.add(circle);
         fabricCanvas.setActiveObject(circle);
+        setActiveObject(circle);
+        setIsDrawing(true);
       } else if (activeTool === "text") {
         const text = new fabric.Textbox("Double click to edit", {
           left: pointer.x,
@@ -128,12 +141,60 @@ export const DrawingCanvas: React.FC = () => {
       }
     };
 
+    const handleMouseMove = (options: { e: MouseEvent }) => {
+      if (!isDrawing || !fabricCanvas || !activeObject || !startPoint) return;
+      
+      const pointer = fabricCanvas.getPointer(options.e);
+      
+      if (activeTool === "rectangle" && activeObject instanceof fabric.Rect) {
+        const width = Math.abs(pointer.x - startPoint.x);
+        const height = Math.abs(pointer.y - startPoint.y);
+        
+        // Adjust the left/top position if the user drags leftward/upward
+        if (pointer.x < startPoint.x) {
+          activeObject.set({ left: pointer.x });
+        }
+        if (pointer.y < startPoint.y) {
+          activeObject.set({ top: pointer.y });
+        }
+        
+        activeObject.set({ width, height });
+        fabricCanvas.renderAll();
+      } else if (activeTool === "circle" && activeObject instanceof fabric.Circle) {
+        // Calculate radius based on distance from start point
+        const dx = pointer.x - startPoint.x;
+        const dy = pointer.y - startPoint.y;
+        const radius = Math.sqrt(dx * dx + dy * dy);
+        
+        activeObject.set({ radius });
+        fabricCanvas.renderAll();
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isDrawing && fabricCanvas && activeObject) {
+        setIsDrawing(false);
+        setActiveObject(null);
+        fabricCanvas.renderAll();
+        
+        // Emit the object to other users
+        socket.emit("object-added", {
+          userId: currentUser.id,
+          objectJSON: activeObject.toJSON()
+        });
+      }
+    };
+
     fabricCanvas.on("mouse:down", handleMouseDown);
+    fabricCanvas.on("mouse:move", handleMouseMove);
+    fabricCanvas.on("mouse:up", handleMouseUp);
     
     return () => {
       fabricCanvas.off("mouse:down", handleMouseDown);
+      fabricCanvas.off("mouse:move", handleMouseMove);
+      fabricCanvas.off("mouse:up", handleMouseUp);
     };
-  }, [activeTool, strokeColor, strokeWidth, opacity, fabricCanvas]);
+  }, [activeTool, strokeColor, strokeWidth, opacity, fabricCanvas, isDrawing, activeObject, startPoint, currentUser.id]);
 
   // Emit object added/modified events for collaboration
   useEffect(() => {
@@ -141,18 +202,22 @@ export const DrawingCanvas: React.FC = () => {
     
     const handleObjectAdded = (e: fabric.IEvent) => {
       // In a real app, you would emit this to the socket
-      socket.emit("object-added", {
-        userId: currentUser.id,
-        objectJSON: e.target?.toJSON()
-      });
+      if (!isDrawing && e.target) {  // Only emit if not in the middle of drawing
+        socket.emit("object-added", {
+          userId: currentUser.id,
+          objectJSON: e.target.toJSON()
+        });
+      }
     };
     
     const handleObjectModified = (e: fabric.IEvent) => {
       // In a real app, you would emit this to the socket
-      socket.emit("object-modified", {
-        userId: currentUser.id,
-        objectJSON: e.target?.toJSON()
-      });
+      if (e.target) {
+        socket.emit("object-modified", {
+          userId: currentUser.id,
+          objectJSON: e.target.toJSON()
+        });
+      }
     };
     
     fabricCanvas.on("object:added", handleObjectAdded);
@@ -162,7 +227,7 @@ export const DrawingCanvas: React.FC = () => {
       fabricCanvas.off("object:added", handleObjectAdded);
       fabricCanvas.off("object:modified", handleObjectModified);
     };
-  }, [fabricCanvas, currentUser.id]);
+  }, [fabricCanvas, currentUser.id, isDrawing]);
 
   return (
     <div className="flex-1 overflow-hidden drawing-area relative">
