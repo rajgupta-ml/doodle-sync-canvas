@@ -1,6 +1,6 @@
 
 import { v4 as uuidv4 } from "uuid";
-import faker from "faker";
+import { faker } from "@faker-js/faker";
 
 // Simple user session management
 export interface User {
@@ -23,7 +23,7 @@ const COLORS = [
 export function generateUser(): User {
   return {
     id: uuidv4(),
-    name: faker.name.findName(),
+    name: faker.person.fullName(),
     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random().toString(36).substring(7)}`,
     status: "online",
     color: COLORS[Math.floor(Math.random() * COLORS.length)],
