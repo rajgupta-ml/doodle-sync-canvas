@@ -1,11 +1,20 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { Header } from "@/components/Header";
+import { Toolbar } from "@/components/Toolbar";
+import { DrawingCanvas } from "@/components/DrawingCanvas";
+import { PropertiesPanel } from "@/components/PropertiesPanel";
+import { TeamPanel } from "@/components/TeamPanel";
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="flex flex-col h-screen">
+      <Header />
+      
+      <div className="flex flex-1 overflow-hidden">
+        <DrawingCanvas />
+        <Toolbar />
+        <PropertiesPanel />
+        <TeamPanel />
       </div>
     </div>
   );
